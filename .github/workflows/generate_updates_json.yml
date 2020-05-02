@@ -1,0 +1,114 @@
+name: 'Generate Updates JSON'
+on:
+  push:
+    branches:
+      - master
+  repository_dispatch:
+    types: [github_release_update, development_build_update]
+  schedule:
+    - cron: '0 22 * * *'
+
+jobs:
+  # Wait for up to two minutes for previous workflow run to complete, abort if not done by then
+  pre-ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: 'Block Concurrent Executions'
+        uses: softprops/turnstyle@v1
+        with:
+          poll-interval-seconds: 15
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  generate_updates:
+    needs: pre-ci
+    name: 'Generate Updates JSON'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install Prereqs
+        run: |
+          sudo apt-get install libsodium-dev
+      - name: Checkout master branch
+        uses: actions/checkout@v2
+        with:
+          ref: master
+          path: master
+          submodules: recursive
+      - name: Create working directories
+        run: |
+          mkdir -p "${GITHUB_WORKSPACE}/data/master_branch"
+          mkdir -p "${GITHUB_WORKSPACE}/data/github_releases"
+          mkdir -p "${GITHUB_WORKSPACE}/data/generated"
+          mkdir -p "${GITHUB_WORKSPACE}/data/tmp"
+          mkdir -p "${GITHUB_WORKSPACE}/data/signjson/build"
+          mkdir -p "${GITHUB_WORKSPACE}/data/signjson/bin"
+      - name: Fetch latest GitHub Release info
+        uses: past-due/fetch-release-info@master
+        with:
+          github_repo: 'Warzone2100/warzone2100'
+          github_token: '${{ secrets.GITHUB_TOKEN }}'
+          output_directory: '${{ github.workspace }}/data/github_releases'
+          cache_directory: '${{ github.workspace }}/_tmp_cache_data/github_releases'
+      - name: Fetch latest successful master commit info
+        working-directory: "${{ github.workspace }}/data/master_branch"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          GITHUB_REPOSITORY="Warzone2100/warzone2100" BRANCH="master" "${GITHUB_WORKSPACE}/master/ci/process_latest_successful_commit.sh"
+      - name: Generate updates.json
+        working-directory: "${{ github.workspace }}/data/generated"
+        run: |
+          python3 "${GITHUB_WORKSPACE}/master/ci/generate_updates_json.py" -r "${GITHUB_WORKSPACE}/data/github_releases/latest.json" -d "${GITHUB_WORKSPACE}/data/master_branch/latest_successful_commit.json"
+          cat "updates.json"
+      - name: Minify updates.json
+        working-directory: "${{ github.workspace }}/data/generated"
+        run: |
+          cat "updates.json" | jq -c . > "updates.min.json"
+          rm "updates.json"
+          mv "updates.min.json" "updates.json"
+      - name: Compile signjson tool
+        working-directory: "${{ github.workspace }}/data/signjson/build"
+        run: |
+          cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo "-DCMAKE_INSTALL_PREFIX:PATH=${GITHUB_WORKSPACE}/data/signjson" "${GITHUB_WORKSPACE}/master/signjson"
+          cmake --build . --target install
+      - name: Digitally sign updates.json
+        working-directory: "${{ github.workspace }}/data/generated"
+        run: |
+          "${GITHUB_WORKSPACE}/data/signjson/bin/signjson" -k "${{ secrets.SIGNJSON_B64_SECRETKEY }}" "updates.json"
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v2
+        with:
+          ref: gh-pages
+          path: gh-pages
+      - name: Copy updates.json to gh-pages branch - if data has changed
+        id: copy_data
+        run: |
+          NEW_FILE="${GITHUB_WORKSPACE}/data/generated/updates.json"
+          EXISTING_FILE="${GITHUB_WORKSPACE}/gh-pages/wz2100.json"
+          if [[ "${GITHUB_EVENT_NAME}" != "schedule" ]] && [ -f "${EXISTING_FILE}" ]; then
+            FILTERED_KEYS='["SIGNATURE","validThru"]'
+            NEW_FILTERED="${GITHUB_WORKSPACE}/data/tmp/new_filtered.json"
+            EXISTING_FILTERED="${GITHUB_WORKSPACE}/data/tmp/old_filtered.json"
+            jq --argjson filtered_keys ''"${FILTERED_KEYS}"'' -cS '. | with_entries( select( .key as $key | $filtered_keys | index($key) == null ) )' "${NEW_FILE}" > "${NEW_FILTERED}"
+            jq --argjson filtered_keys ''"${FILTERED_KEYS}"'' -cS '. | with_entries( select( .key as $key | $filtered_keys | index($key) == null ) )' "${EXISTING_FILE}" > "${EXISTING_FILTERED}"
+            CMP_STATUS=$(cmp -s "${NEW_FILTERED}" "${EXISTING_FILTERED}" && echo "0" || echo "1")
+            if [[ $CMP_STATUS = 0 ]]; then
+              # Files are effectively the same
+              echo "Skipping copy of newly-generated file (content is equal)"
+              echo "::set-output name=skip_publish::true"
+              exit 0
+            fi
+          fi
+          echo "Copying newly-generated file"
+          cp "${NEW_FILE}" "${EXISTING_FILE}"
+      - name: Publish any changes to data files
+        if: (steps.copy_data.outputs.skip_publish != 'true')
+        working-directory: "./gh-pages"
+        run: |
+          git config user.name "wzdev-ci"
+          git config user.email "61424532+wzdev-ci@users.noreply.github.com"
+          git add -A
+          timestamp=$(date -u)
+          git commit -m "Generate wz2100.json: ${timestamp}" || exit 0
+          git pull --rebase
+          git push

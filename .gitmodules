@@ -1,0 +1,6 @@
+[submodule "signjson/EmbeddedJSONSignature"]
+	path = signjson/EmbeddedJSONSignature
+	url = https://github.com/past-due/EmbeddedJSONSignature.git
+[submodule "signjson/args"]
+	path = signjson/args
+	url = https://github.com/Taywee/args.git
