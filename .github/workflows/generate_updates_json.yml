@@ -49,6 +49,11 @@ jobs:
           github_token: '${{ secrets.GITHUB_TOKEN }}'
           output_directory: '${{ github.workspace }}/data/github_releases'
           cache_directory: '${{ github.workspace }}/_tmp_cache_data/github_releases'
+      - name: Fetch first page of GitHub releases list
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          curl -H "Authorization: token ${GITHUB_TOKEN}" -s "https://api.github.com/repos/Warzone2100/warzone2100/releases" > "${GITHUB_WORKSPACE}/data/github_releases/index.json"
       - name: Fetch latest successful master commit info
         working-directory: "${{ github.workspace }}/data/master_branch"
         env:
@@ -58,7 +63,7 @@ jobs:
       - name: Generate updates.json
         working-directory: "${{ github.workspace }}/data/generated"
         run: |
-          python3 "${GITHUB_WORKSPACE}/master/ci/generate_updates_json.py" -r "${GITHUB_WORKSPACE}/data/github_releases/latest.json" -d "${GITHUB_WORKSPACE}/data/master_branch/latest_successful_commit.json"
+          python3 "${GITHUB_WORKSPACE}/master/ci/generate_updates_json.py" -r "${GITHUB_WORKSPACE}/data/github_releases/latest.json" -i "${GITHUB_WORKSPACE}/data/github_releases/index.json" -d "${GITHUB_WORKSPACE}/data/master_branch/latest_successful_commit.json"
           cat "updates.json"
       - name: Minify updates.json
         working-directory: "${{ github.workspace }}/data/generated"
