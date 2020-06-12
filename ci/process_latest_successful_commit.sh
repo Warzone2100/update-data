@@ -107,4 +107,17 @@ COMMIT_SHORT_HASH="$(echo "${LATEST_COMMIT_SHA_THAT_PASSED_CHECKS}" | head -c 7)
 MASTER_VERSION="master_${COMMIT_SHORT_HASH}"
 
 # Write out ${LATEST_COMMIT_FULL_DATA}
-echo "${LATEST_COMMIT_FULL_DATA}" > "latest_successful_commit.json"
+echo "${LATEST_COMMIT_FULL_DATA}" > "latest_successful_commit_tmp.json"
+
+# Now get some additional data:
+LATEST_COMMIT_NODE_ID="$(echo "${LATEST_COMMIT_FULL_DATA}" | jq --raw-output '.node_id')"
+echo "LATEST_COMMIT_NODE_ID=${LATEST_COMMIT_NODE_ID}"
+NODE_INFO="$(curl -H "Authorization: bearer ${GITHUB_TOKEN}" -X POST -d " \
+ { \
+   \"query\": \"{ node(id: \\\"${LATEST_COMMIT_NODE_ID}\\\") { ... on Commit { id, oid, url, history(first: 0) { totalCount } } } }\" \
+ } \
+" -s "https://api.github.com/graphql")"
+LATEST_COMMIT_COUNT="$(echo "${NODE_INFO}" | jq --raw-output '.data.node.history.totalCount')"
+echo "LATEST_COMMIT_COUNT=${LATEST_COMMIT_COUNT}"
+echo "{ \"wz_history\": { \"commit_count\": \"${LATEST_COMMIT_COUNT}\" } }" > "additional_commit_data.json"
+jq -s '.[0] * .[1]' "latest_successful_commit_tmp.json" "additional_commit_data.json" > "latest_successful_commit.json"
