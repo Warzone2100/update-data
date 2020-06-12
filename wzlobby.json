@@ -1,0 +1,35 @@
+{
+  "listMOTD_Default": "Welcome! The latest version of Warzone 2100 is 3.3.0\nDownload @ https://wz2100.net",
+  "listMOTD_LastHostedGame": "Download 3.3.0 - 3.1.5 & 3.2.3 are unsupported!",
+  "unsupportedHostMessage": "Your version of the game is not supported any longer.\n Update your game version today @ https://wz2100.net !",
+  "versionProperties": [
+    {
+      "versionStringGlob": "3.3.0",
+      "motd": "Welcome to Warzone 2100!\nYour game is now hosted on the lobby server.",
+      "supported": true
+    },
+    {
+      "versionStringGlob": "master *",
+      "motd": "Thank you for trying a development build of Warzone 2100!\nYour game is now hosted on the lobby server.",
+      "supported": true
+    },
+    {
+      "versionStringGlob": "*",
+      "motd": "Please upgrade your Warzone to 3.3.0! Your version is NOT supported.\nSee: https://wz2100.net",
+      "supported": false
+    }
+  ],
+  "supportedNetcodeVerMajorMinor": {
+    "0x1000": [],
+    "0x10a0": [
+      "15342",
+      "15343",
+      "15344",
+      "15345",
+      "15346"
+    ],
+    "0x30B0": [
+      "9"
+    ]
+  }
+}
