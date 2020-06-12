@@ -86,7 +86,7 @@ jobs:
           ref: gh-pages
           path: gh-pages
       - name: Copy updates.json to gh-pages branch - if data has changed
-        id: copy_data
+        id: copy_updates
         run: |
           NEW_FILE="${GITHUB_WORKSPACE}/data/generated/updates.json"
           EXISTING_FILE="${GITHUB_WORKSPACE}/gh-pages/wz2100.json"
@@ -106,14 +106,49 @@ jobs:
           fi
           echo "Copying newly-generated file"
           cp "${NEW_FILE}" "${EXISTING_FILE}"
+      # Note: The following step must be run with a working directory of the gh-pages branch, as it stores additional _data information
+      - name: Generate wzlobby.json
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        working-directory: "${{ github.workspace }}/gh-pages"
+        run: |
+          NEW_FILE="${GITHUB_WORKSPACE}/data/generated/lobby.json"
+
+          python3 "${GITHUB_WORKSPACE}/master/ci/generate_lobby_json.py" \
+            -r "${GITHUB_WORKSPACE}/data/github_releases/latest.json" \
+            -i "${GITHUB_WORKSPACE}/data/github_releases/index.json" \
+            -d "${GITHUB_WORKSPACE}/data/master_branch/latest_successful_commit.json" \
+            -o "${NEW_FILE}"
+          cat "${NEW_FILE}"
+      - name: Copy wzlobby.json to gh-pages branch - if data has changed
+        id: copy_wzlobby
+        run: |
+          NEW_FILE="${GITHUB_WORKSPACE}/data/generated/lobby.json"
+          EXISTING_FILE="${GITHUB_WORKSPACE}/gh-pages/wzlobby.json"
+          if [ -f "${EXISTING_FILE}" ]; then
+            FILTERED_KEYS='["SIGNATURE","validThru"]'
+            NEW_FILTERED="${GITHUB_WORKSPACE}/data/tmp/newlobby_filtered.json"
+            EXISTING_FILTERED="${GITHUB_WORKSPACE}/data/tmp/oldlobby_filtered.json"
+            jq --argjson filtered_keys ''"${FILTERED_KEYS}"'' -cS '. | with_entries( select( .key as $key | $filtered_keys | index($key) == null ) )' "${NEW_FILE}" > "${NEW_FILTERED}"
+            jq --argjson filtered_keys ''"${FILTERED_KEYS}"'' -cS '. | with_entries( select( .key as $key | $filtered_keys | index($key) == null ) )' "${EXISTING_FILE}" > "${EXISTING_FILTERED}"
+            CMP_STATUS=$(cmp -s "${NEW_FILTERED}" "${EXISTING_FILTERED}" && echo "0" || echo "1")
+            if [[ $CMP_STATUS = 0 ]]; then
+              # Files are effectively the same
+              echo "Skipping copy of newly-generated file (content is equal)"
+              echo "::set-output name=skip_publish::true"
+              exit 0
+            fi
+          fi
+          echo "Copying newly-generated file"
+          cp "${NEW_FILE}" "${EXISTING_FILE}"
       - name: Publish any changes to data files
-        if: (steps.copy_data.outputs.skip_publish != 'true')
+        if: (steps.copy_updates.outputs.skip_publish != 'true') || (steps.copy_wzlobby.outputs.skip_publish != 'true')
         working-directory: "./gh-pages"
         run: |
           git config user.name "wzdev-ci"
           git config user.email "61424532+wzdev-ci@users.noreply.github.com"
           git add -A
           timestamp=$(date -u)
-          git commit -m "Generate wz2100.json: ${timestamp}" || exit 0
+          git commit -m "Generate wz2100 json: ${timestamp}" || exit 0
           git pull --rebase
           git push
