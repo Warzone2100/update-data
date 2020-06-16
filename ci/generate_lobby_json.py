@@ -112,7 +112,7 @@ def gen_development_versionProperties(latestdevcommit: dict) -> dict:
 def get_development_netcodeMinorVerArray(latestdevcommit: dict) -> dict:
     latest_vcs_commit_count = int(latestdevcommit['wz_history']['commit_count'])
     # support the last N development builds
-    SUPPORTED_DEV_BUILDS_NUM = 5
+    SUPPORTED_DEV_BUILDS_NUM = 30
     return list(str(i) for i in range(latest_vcs_commit_count - (SUPPORTED_DEV_BUILDS_NUM - 1), latest_vcs_commit_count + 1))
 
 def create_path_for_file_if_not_exists(file_path):
