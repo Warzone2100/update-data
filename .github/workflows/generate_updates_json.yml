@@ -35,6 +35,7 @@ jobs:
           path: master
           submodules: recursive
       - name: Create working directories
+        id: preparefolders
         run: |
           mkdir -p "${GITHUB_WORKSPACE}/data/master_branch"
           mkdir -p "${GITHUB_WORKSPACE}/data/github_releases"
@@ -42,6 +43,9 @@ jobs:
           mkdir -p "${GITHUB_WORKSPACE}/data/tmp"
           mkdir -p "${GITHUB_WORKSPACE}/data/signjson/build"
           mkdir -p "${GITHUB_WORKSPACE}/data/signjson/bin"
+          CHANGELOG_DIR="${GITHUB_WORKSPACE}/temp/changes"
+          mkdir -p "${CHANGELOG_DIR}"
+          echo "::set-output name=CHANGELOG_DIR::${CHANGELOG_DIR}"
       - name: Fetch latest GitHub Release info
         uses: past-due/fetch-release-info@master
         with:
@@ -160,6 +164,10 @@ jobs:
           echo "::set-output name=PROCESS_DEPLOYMENT::true"
           echo "::set-output name=GH_PAGES_BRANCH_COMMIT_SHA::${NEW_COMMIT_SHA}"
           echo "Done."
+          # Get the list of files / paths changed in the latest commit
+          CHANGED_FILES_LIST="${{ steps.preparefolders.outputs.CHANGELOG_DIR }}/changedpaths.txt"
+          git diff-tree --no-commit-id --name-only -r -z HEAD | tr '\0' '\n' > "${CHANGED_FILES_LIST}"
+          echo "::set-output name=CHANGED_FILES_LIST::${CHANGED_FILES_LIST}"
           exit 0
       - name: 'Wait for Deployment'
         id: deployments
@@ -239,11 +247,39 @@ jobs:
             echo "::error ::Deployment did not appear to succeed? (state: ${DEPLOYMENT_STATE})"
             exit 1
           fi
+          # Sleep for 10 seconds
+          sleep 10
+          echo "Done."
+      - name: 'Generate Cloudflare Cache Purge URLs List'
+        id: purgeurls
+        if: success() && (steps.publishpages.outputs.PROCESS_DEPLOYMENT == 'true')
+        run: |
+          PURGE_URLS_DATA_FILES_DIR="${{ steps.preparefolders.outputs.CHANGELOG_DIR }}/output"
+          python3 "${GITHUB_WORKSPACE}/master/ci/gen_purge_url_batches.py" "data.wz2100.net" "${{ steps.publishpages.outputs.CHANGED_FILES_LIST }}" "${PURGE_URLS_DATA_FILES_DIR}"
+          echo "::set-output name=PURGE_URLS_DATA_FILES_DIR::${PURGE_URLS_DATA_FILES_DIR}"
+      - name: 'Purge Cloudflare Cache'
+        if: success() && (steps.publishpages.outputs.PROCESS_DEPLOYMENT == 'true')
+        env:
+          CLOUDFLARE_ZONE: ${{ secrets.CLOUDFLARE_WZ2100_ZONE }}
+          CLOUDFLARE_CACHEPURGE_TOKEN: ${{ secrets.CLOUDFLARE_WZ2100_CACHEPURGE_TOKEN }}
+        run: |
+          # Needs to handle multiple data files, since each purge command can only send a max of 30 URLs
+          for file in ${{ steps.purgeurls.outputs.PURGE_URLS_DATA_FILES_DIR }}/*
+          do
+            echo "File: $file"
+            curl -X POST "https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE}/purge_cache" \
+                 -H "Authorization: Bearer ${CLOUDFLARE_CACHEPURGE_TOKEN}" \
+                 -H "Content-Type: application/json" \
+                 --data-binary "@$file"
+          done; # file
+          echo "Done."
       - name: "Inform lobby server"
         if: success() && (steps.publishpages.outputs.PROCESS_DEPLOYMENT == 'true') && (steps.copy_wzlobby.outputs.skip_publish != 'true')
         env:
           LOBBY_SERVER_INFORM_COMMAND: ${{ secrets.LOBBY_SERVER_INFORM_COMMAND }}
           LOBBY_SERVER_INFORM_PASS: ${{ secrets.LOBBY_SERVER_INFORM_PASS }}
         run: |
+          sleep 10
+          # Inform the lobby server
           python3 "${GITHUB_WORKSPACE}/master/ci/inform_lobby.py" "lobby.wz2100.net" 9990 "${LOBBY_SERVER_INFORM_COMMAND}" -d "${LOBBY_SERVER_INFORM_PASS}"
           echo "Done."
