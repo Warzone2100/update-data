@@ -76,7 +76,7 @@ def gen_release_channel(latestgithubrelease: dict) -> dict:
 def gen_development_channel(latestdevcommit: dict) -> dict:
     channel = dict()
     channel['channel'] = 'development'
-    channel['channelConditional'] = '(GIT_BRANCH =~ "^master$") && !(GIT_TAG =~ ".+")'
+    channel['channelConditional'] = '(GIT_BRANCH =~ "^master$") && !(GIT_TAG =~ ".+") && (WZ_PACKAGE_DISTRIBUTOR =~ "^wz2100.net$")'
     channel['releases'] = []
     # Latest master branch commit from GitHub
     try:
