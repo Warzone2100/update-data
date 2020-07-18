@@ -62,7 +62,7 @@ def gen_release_channel(latestgithubrelease: dict) -> dict:
     # Latest GitHub release (for Windows, macOS, Linux)
     try:
         release = dict()
-        release['buildPropertyMatch'] = '!(GIT_TAG =~ "{0}") && (PLATFORM =~ "Windows|Mac OS X|Linux|.*")'.format(latestgithubrelease['tag_name'])
+        release['buildPropertyMatch'] = '!(GIT_TAG =~ "{0}") && (PLATFORM =~ "Windows|Mac OS X|Linux|.*") && (WZ_PACKAGE_DISTRIBUTOR =~ "^wz2100.net$")'.format(latestgithubrelease['tag_name'])
         release['version'] = latestgithubrelease['tag_name']
         release['published_at'] = latestgithubrelease['published_at']
         release['notification'] = { 'base': 'release_update', 'id': latestgithubrelease['tag_name'] }
