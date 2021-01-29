@@ -34,6 +34,7 @@ jobs:
           ref: master
           path: master
           submodules: recursive
+          persist-credentials: false
       - name: Create working directories
         id: preparefolders
         run: |
@@ -89,6 +90,7 @@ jobs:
         with:
           ref: gh-pages
           path: gh-pages
+          persist-credentials: false
       - name: Copy updates.json to gh-pages branch - if data has changed
         id: copy_updates
         run: |
@@ -149,18 +151,20 @@ jobs:
         id: publishpages
         if: success() && ((steps.copy_updates.outputs.skip_publish != 'true') || (steps.copy_wzlobby.outputs.skip_publish != 'true'))
         working-directory: "./gh-pages"
+        env:
+          PUSH_PAT: ${{ secrets.WZ2100_UPDATES_PUSH_TOKEN }} # use a PAT
         run: |
           git config user.name "wzdev-ci"
           git config user.email "61424532+wzdev-ci@users.noreply.github.com"
           git add -A
           timestamp=$(date -u)
           git commit -m "Generate wz2100 json: ${timestamp}" || { echo "::set-output name=PROCESS_DEPLOYMENT::false" && exit 0; }
-          git pull --rebase
+          #git pull --rebase
           # Get the new commit's SHA
           NEW_COMMIT_SHA=$(git rev-parse --verify HEAD)
           echo "NEW_COMMIT_SHA=${NEW_COMMIT_SHA}"
           # Push the new commit to the gh-pages branch
-          git push
+          git push "https://${PUSH_PAT}@github.com/Warzone2100/update-data.git" gh-pages:gh-pages
           echo "::set-output name=PROCESS_DEPLOYMENT::true"
           echo "::set-output name=GH_PAGES_BRANCH_COMMIT_SHA::${NEW_COMMIT_SHA}"
           echo "Done."
