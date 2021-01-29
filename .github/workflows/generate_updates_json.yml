@@ -4,9 +4,7 @@ on:
     branches:
       - master
   repository_dispatch:
-    types: [github_release_update, development_build_update]
-  schedule:
-    - cron: '0 22 * * *'
+    types: [github_release_update, development_build_update, scheduled_update]
 
 jobs:
   # Wait for up to two minutes for previous workflow run to complete, abort if not done by then
