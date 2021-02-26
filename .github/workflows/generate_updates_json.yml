@@ -94,7 +94,7 @@ jobs:
         run: |
           NEW_FILE="${GITHUB_WORKSPACE}/data/generated/updates.json"
           EXISTING_FILE="${GITHUB_WORKSPACE}/gh-pages/wz2100.json"
-          if [[ "${GITHUB_EVENT_NAME}" != "schedule" ]] && [ -f "${EXISTING_FILE}" ]; then
+          if [[ "${{ github.event.action }}" != "scheduled_update" ]] && [ -f "${EXISTING_FILE}" ]; then
             FILTERED_KEYS='["SIGNATURE","validThru"]'
             NEW_FILTERED="${GITHUB_WORKSPACE}/data/tmp/new_filtered.json"
             EXISTING_FILTERED="${GITHUB_WORKSPACE}/data/tmp/old_filtered.json"
