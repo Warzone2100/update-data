@@ -13,6 +13,8 @@ import urllib.request
 import os
 from pathlib import Path
 
+STABLE_RELEASE_GRACE_DAYS = 2
+
 # Modified version of urlretrieve from: https://github.com/python/cpython/blob/master/Lib/urllib/request.py
 # Modified to support accepting a Request object as the url
 def urlretrieve(url, filename, reporthook=None, data=None):
@@ -78,6 +80,36 @@ def get_newer_prereleases(latestgithubrelease: dict, releaselist: list) -> dict:
         raise
     
     return PrereleaseInfo(latest_prerelease, prerelease_list)
+
+def get_prior_stable_releases(latestgithubrelease: dict, releaselist: list) -> dict:
+    try:
+        latest_release_id = latestgithubrelease['id']
+    except KeyError as e:
+        print("Missing expected key in latestgithubrelease JSON: {0}".format(e.args[0]))
+        raise
+    # Latest Preview release (if it's newer than the latest stable release)
+    foundlatestrelease = False
+    priorrelease_list = []
+    try:
+        # Find the first non-draft, prerelease
+        for release in releaselist:
+            if release['id'] == latest_release_id:
+                # found the latest release
+                foundlatestrelease = True
+                continue
+            elif foundlatestrelease:
+                # Process releases after latest release
+                if release['draft']:
+                    continue # skip draft releases
+                if release['prerelease']:
+                    continue # skip prerelease releases
+                # Found a prior stable release
+                priorrelease_list.append(release)
+    except KeyError as e:
+        print("Missing expected key in releaselist JSON: {0}".format(e.args[0]))
+        raise
+    
+    return priorrelease_list
 
 def gen_prerelease_versionProperties(latestgithubrelease: dict, releaselist: list) -> dict:
     result = get_newer_prereleases(latestgithubrelease, releaselist)
@@ -217,10 +249,37 @@ def get_netcode_ver_from_release(release: dict, github_token = None, cache_direc
     
     return result
 
+def convert_github_json_date_to_datetime(github_date_string: str):
+    return datetime.strptime(github_date_string, '%Y-%m-%dT%H:%M:%SZ')
+
+def allowed_prior_stable_release(release: dict):
+    release_published_at = convert_github_json_date_to_datetime(release['published_at'])
+    return ((datetime.now() - release_published_at).days <= STABLE_RELEASE_GRACE_DAYS)
+
 def get_releases_netcodeVersions(latestgithubrelease: dict, releaselist: list) -> list:
     github_token = os.getenv("GITHUB_TOKEN", default=None)
     
     versions = []
+    
+    try:
+        latest_release_published_at = convert_github_json_date_to_datetime(latestgithubrelease['published_at'])
+        if (datetime.now() - latest_release_published_at).days <= STABLE_RELEASE_GRACE_DAYS:
+            allowed_prior_releases = []
+            # Also permit at least one prior release, since the new release is brand-new (and any stable releases within past STABLE_RELEASE_GRACE_DAYS days)
+            prior_stable_releases = get_prior_stable_releases(latestgithubrelease, releaselist)
+            if prior_stable_releases:
+                allowed_prior_releases_iterator = filter(allowed_prior_stable_release, prior_stable_releases)
+                allowed_prior_releases = list(allowed_prior_releases_iterator)
+                if not allowed_prior_releases:
+                    # Ensure at least one (the last) prior release is permitted when a new release is brand-new
+                    allowed_prior_releases.append(prior_stable_releases[0])
+            for prior_release in allowed_prior_releases:
+                versions.append(get_netcode_ver_from_release(prior_release, github_token))
+    except ValueError as e:
+        # Parsing the JSON dates into datetime objects likely failed
+        print("Failed to extract additional previous stable releases from release info, with error: {0}".format(str(e)))
+        print("Skipping this step")
+    
     versions.append(get_netcode_ver_from_release(latestgithubrelease, github_token))
     
     result = get_newer_prereleases(latestgithubrelease, releaselist)
