@@ -54,6 +54,89 @@ def gen_prerelease_channel(latestgithubrelease: dict, releaselist: list) -> dict
     else:
         return None
 
+def get_prior_stable_releases(latestgithubrelease: dict, releaselist: list) -> dict:
+    try:
+        latest_release_id = latestgithubrelease['id']
+    except KeyError as e:
+        print("Missing expected key in latestgithubrelease JSON: {0}".format(e.args[0]))
+        raise
+    # Latest Preview release (if it's newer than the latest stable release)
+    foundlatestrelease = False
+    priorrelease_list = []
+    try:
+        # Find the first non-draft, prerelease
+        for release in releaselist:
+            if release['id'] == latest_release_id:
+                # found the latest release
+                foundlatestrelease = True
+                continue
+            elif foundlatestrelease:
+                # Process releases after latest release
+                if release['draft']:
+                    continue # skip draft releases
+                if release['prerelease']:
+                    continue # skip prerelease releases
+                # Found a prior stable release
+                priorrelease_list.append(release)
+    except KeyError as e:
+        print("Missing expected key in releaselist JSON: {0}".format(e.args[0]))
+        raise
+    
+    return priorrelease_list
+
+def convert_github_json_date_to_datetime(github_date_string: str):
+    return datetime.strptime(github_date_string, '%Y-%m-%dT%H:%M:%SZ')
+
+MS_STORE_RELEASE_GRACE_DAYS = 3
+
+def msstore_allowed_prior_stable_release(release: dict):
+    release_published_at = convert_github_json_date_to_datetime(release['published_at'])
+    return ((datetime.now() - release_published_at).days <= MS_STORE_RELEASE_GRACE_DAYS)
+
+def gen_msstore_release_channel(latestgithubrelease: dict, releaselist: list) -> dict:
+    channel = dict()
+    channel['channel'] = 'release_ms_store'
+    channel['channelConditional'] = '(WIN_PACKAGE_FULLNAME =~ "^48148WZ2100Project.Warzone2100forWindows_.*$") && (GIT_TAG =~ ".+")'
+    channel['releases'] = []
+    
+    latest_git_tags = [latestgithubrelease['tag_name']]
+    # Latest Microsoft Store release
+    # NOTES:
+    # - To be "correct", we'd deal with the MS Store API to verify when the latest release has gone through the process and is fully published...
+    # - In lieu of that, permit all release tags published within the last 3 days or at least one prior release tag if the latest tag is not yet 3 days old
+    prior_stable_releases = get_prior_stable_releases(latestgithubrelease, releaselist)
+    if prior_stable_releases:
+        try:
+            latest_release_published_at = convert_github_json_date_to_datetime(latestgithubrelease['published_at'])
+            latest_release_age_days = (datetime.now() - latest_release_published_at).days
+            allowed_prior_releases_iterator = filter(msstore_allowed_prior_stable_release, prior_stable_releases)
+            allowed_prior_releases = list(allowed_prior_releases_iterator)
+            if (not allowed_prior_releases) and (latest_release_age_days <= MS_STORE_RELEASE_GRACE_DAYS):
+                # Ensure at least one (the last) prior release is permitted when a new release is brand-new
+                allowed_prior_releases.append(prior_stable_releases[0])
+            for prior_release in allowed_prior_releases:
+                latest_git_tags.append(prior_release['tag_name'])
+        except ValueError as e:
+            # Parsing the JSON dates into datetime objects likely failed
+            print("Failed to extract additional previous stable releases from release info, with error: {0}".format(str(e)))
+            print("Skipping this step")
+    
+    try:
+        release = dict()
+        buildPropertyMatches = []
+        for git_tag in latest_git_tags:
+            buildPropertyMatches.append('!(GIT_TAG =~ "^{0}$")'.format(git_tag))
+        release['buildPropertyMatch'] = ' && '.join(buildPropertyMatches)
+        release['version'] = latestgithubrelease['tag_name']
+        release['published_at'] = latestgithubrelease['published_at']
+        release['notification'] = { 'base': 'msstore_release_update', 'id': latestgithubrelease['tag_name'] }
+        release['updateLink'] = 'https://data.wz2100.net/redirect/msstoreupdates.html'
+        channel['releases'].append(release)
+    except KeyError as e:
+        print("Missing expected key in latestgithubrelease JSON: {0}".format(e.args[0]))
+        raise
+    return channel
+
 def gen_release_channel(latestgithubrelease: dict) -> dict:
     channel = dict()
     channel['channel'] = 'release'
@@ -103,6 +186,7 @@ def gen_updates_file(latestgithubrelease: dict, releaselist: list, latestdevcomm
     prerelease_channel = gen_prerelease_channel(latestgithubrelease, releaselist)
     if not prerelease_channel is None:
         updates['channels'].append(prerelease_channel)
+    updates['channels'].append(gen_msstore_release_channel(latestgithubrelease, releaselist))
     updates['channels'].append(gen_release_channel(latestgithubrelease))
     updates['channels'].append(gen_development_channel(latestdevcommit))
     return updates
