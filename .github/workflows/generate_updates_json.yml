@@ -6,20 +6,10 @@ on:
   repository_dispatch:
     types: [github_release_update, development_build_update, scheduled_update]
 
+concurrency: generate_updates
+
 jobs:
-  # Wait for up to two minutes for previous workflow run to complete, abort if not done by then
-  pre-ci:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: 'Block Concurrent Executions'
-        uses: softprops/turnstyle@v1
-        with:
-          poll-interval-seconds: 15
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   generate_updates:
-    needs: pre-ci
     name: 'Generate Updates JSON'
     runs-on: ubuntu-latest
     steps:
