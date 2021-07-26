@@ -154,6 +154,18 @@ def gen_release_channel(latestgithubrelease: dict) -> dict:
     except KeyError as e:
         print("Missing expected key in latestgithubrelease JSON: {0}".format(e.args[0]))
         raise
+    # A workaround because some 4.1.0 packages shipped with an incorrect distributor
+    try:
+        release = dict()
+        release['buildPropertyMatch'] = '(GIT_TAG =~ "^4.1.0$") && (PLATFORM =~ "Windows|Mac OS X|Linux|.*")'
+        release['version'] = latestgithubrelease['tag_name']
+        release['published_at'] = latestgithubrelease['published_at']
+        release['notification'] = { 'base': 'release_update', 'id': latestgithubrelease['tag_name'] }
+        release['updateLink'] = 'https://wz2100.net/?platform={{PLATFORM}}'
+        channel['releases'].append(release)
+    except KeyError as e:
+        print("Missing expected key in latestgithubrelease JSON: {0}".format(e.args[0]))
+        raise
     return channel
 
 def gen_development_channel(latestdevcommit: dict) -> dict:
