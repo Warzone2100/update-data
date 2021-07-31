@@ -99,7 +99,7 @@ jobs:
           COPIED_ANY_FILES=0
           for NEW_FILE in ${GITHUB_WORKSPACE}/data/generated/*.json; do
             [ -e "$NEW_FILE" ] || continue
-            EXISTING_FILE="${GITHUB_WORKSPACE}/gh-pages/$(basename "$NEW_FILE").json"
+            EXISTING_FILE="${GITHUB_WORKSPACE}/gh-pages/$(basename "$NEW_FILE")"
             if [[ "${{ github.event.action }}" != "scheduled_update" ]] && [ -f "${EXISTING_FILE}" ]; then
               FILTERED_KEYS='["SIGNATURE","validThru"]'
               NEW_FILTERED="${GITHUB_WORKSPACE}/data/tmp/new_filtered.json"
@@ -113,7 +113,7 @@ jobs:
                 continue
               fi
             fi
-            echo "Copying newly-generated file"
+            echo "Copying newly-generated file: $(basename "$NEW_FILE")"
             cp "${NEW_FILE}" "${EXISTING_FILE}"
             COPIED_ANY_FILES=1
           done
