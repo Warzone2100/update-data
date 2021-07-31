@@ -63,43 +63,65 @@ jobs:
         run: |
           cat "updates.json" | jq -c . > "updates.min.json"
           rm "updates.json"
-          mv "updates.min.json" "updates.json"
+          mv "updates.min.json" "wz2100.json"
+      - name: Generate compat.json
+        working-directory: "${{ github.workspace }}/data/generated"
+        run: |
+          python3 "${GITHUB_WORKSPACE}/master/ci/generate_compat_json.py" -r "${GITHUB_WORKSPACE}/data/github_releases/latest.json" -i "${GITHUB_WORKSPACE}/data/github_releases/index.json" -d "${GITHUB_WORKSPACE}/data/master_branch/latest_successful_commit.json"
+          cat "compat.json"
+      - name: Minify compat.json
+        working-directory: "${{ github.workspace }}/data/generated"
+        run: |
+          cat "compat.json" | jq -c . > "compat.min.json"
+          rm "compat.json"
+          mv "compat.min.json" "wz2100_compat.json"
       - name: Compile signjson tool
         working-directory: "${{ github.workspace }}/data/signjson/build"
         run: |
           cmake -DCMAKE_BUILD_TYPE=RelWithDebInfo "-DCMAKE_INSTALL_PREFIX:PATH=${GITHUB_WORKSPACE}/data/signjson" "${GITHUB_WORKSPACE}/master/signjson"
           cmake --build . --target install
-      - name: Digitally sign updates.json
+      - name: Digitally sign WZ .json
         working-directory: "${{ github.workspace }}/data/generated"
         run: |
-          "${GITHUB_WORKSPACE}/data/signjson/bin/signjson" -k "${{ secrets.SIGNJSON_B64_SECRETKEY }}" "updates.json"
+          echo "Signing wz2100.json"
+          "${GITHUB_WORKSPACE}/data/signjson/bin/signjson" -k "${{ secrets.SIGNJSON_B64_SECRETKEY }}" "wz2100.json"
+          echo "Signing wz2100_compat.json"
+          "${GITHUB_WORKSPACE}/data/signjson/bin/signjson" -k "${{ secrets.SIGNJSON_B64_SECRETKEY }}" "wz2100_compat.json"
       - name: Checkout gh-pages branch
         uses: actions/checkout@v2
         with:
           ref: gh-pages
           path: gh-pages
           persist-credentials: false
-      - name: Copy updates.json to gh-pages branch - if data has changed
+      - name: Copy WZ JSON to gh-pages branch - if data has changed
         id: copy_updates
         run: |
-          NEW_FILE="${GITHUB_WORKSPACE}/data/generated/updates.json"
-          EXISTING_FILE="${GITHUB_WORKSPACE}/gh-pages/wz2100.json"
-          if [[ "${{ github.event.action }}" != "scheduled_update" ]] && [ -f "${EXISTING_FILE}" ]; then
-            FILTERED_KEYS='["SIGNATURE","validThru"]'
-            NEW_FILTERED="${GITHUB_WORKSPACE}/data/tmp/new_filtered.json"
-            EXISTING_FILTERED="${GITHUB_WORKSPACE}/data/tmp/old_filtered.json"
-            jq --argjson filtered_keys ''"${FILTERED_KEYS}"'' -cS '. | with_entries( select( .key as $key | $filtered_keys | index($key) == null ) )' "${NEW_FILE}" > "${NEW_FILTERED}"
-            jq --argjson filtered_keys ''"${FILTERED_KEYS}"'' -cS '. | with_entries( select( .key as $key | $filtered_keys | index($key) == null ) )' "${EXISTING_FILE}" > "${EXISTING_FILTERED}"
-            CMP_STATUS=$(cmp -s "${NEW_FILTERED}" "${EXISTING_FILTERED}" && echo "0" || echo "1")
-            if [[ $CMP_STATUS = 0 ]]; then
-              # Files are effectively the same
-              echo "Skipping copy of newly-generated file (content is equal)"
-              echo "::set-output name=skip_publish::true"
-              exit 0
+          COPIED_ANY_FILES=0
+          for NEW_FILE in ${GITHUB_WORKSPACE}/data/generated/*.json; do
+            [ -e "$NEW_FILE" ] || continue
+            EXISTING_FILE="${GITHUB_WORKSPACE}/gh-pages/$(basename "$NEW_FILE").json"
+            if [[ "${{ github.event.action }}" != "scheduled_update" ]] && [ -f "${EXISTING_FILE}" ]; then
+              FILTERED_KEYS='["SIGNATURE","validThru"]'
+              NEW_FILTERED="${GITHUB_WORKSPACE}/data/tmp/new_filtered.json"
+              EXISTING_FILTERED="${GITHUB_WORKSPACE}/data/tmp/old_filtered.json"
+              jq --argjson filtered_keys ''"${FILTERED_KEYS}"'' -cS '. | with_entries( select( .key as $key | $filtered_keys | index($key) == null ) )' "${NEW_FILE}" > "${NEW_FILTERED}"
+              jq --argjson filtered_keys ''"${FILTERED_KEYS}"'' -cS '. | with_entries( select( .key as $key | $filtered_keys | index($key) == null ) )' "${EXISTING_FILE}" > "${EXISTING_FILTERED}"
+              CMP_STATUS=$(cmp -s "${NEW_FILTERED}" "${EXISTING_FILTERED}" && echo "0" || echo "1")
+              if [[ $CMP_STATUS = 0 ]]; then
+                # Files are effectively the same
+                echo "Skipping copy of newly-generated file (content is equal): $(basename "$NEW_FILE")"
+                continue
+              fi
             fi
+            echo "Copying newly-generated file"
+            cp "${NEW_FILE}" "${EXISTING_FILE}"
+            COPIED_ANY_FILES=1
+          done
+          if [[ $COPIED_ANY_FILES = 0 ]]; then
+            # Files are all effectively the same
+            echo "::set-output name=skip_publish::true"
+            exit 0
           fi
-          echo "Copying newly-generated file"
-          cp "${NEW_FILE}" "${EXISTING_FILE}"
       # Note: The following step must be run with a working directory of the gh-pages branch, as it stores additional _data information
       - name: Generate wzlobby.json
         env:
