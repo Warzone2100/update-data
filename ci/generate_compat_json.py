@@ -20,6 +20,16 @@ def gen_release_channel(latestgithubrelease: dict) -> dict:
     channel['channel'] = 'release'
     channel['channelConditional'] = 'GIT_TAG =~ ".+"'
     channel['compatNotices'] = []
+    try:
+        release = dict()
+        release['propertyMatch'] = '(GIT_TAG =~ ".+") && (WZ_PACKAGE_DISTRIBUTOR =~ "^wz2100.net$") && (WIN_LOADEDMODULENAMES =~ "\\"gameoverlayrenderer64.dll\\"") && ((!(FIRST_LAUNCH =~ "^2022-.+") && !(FIRST_LAUNCH =~ "^2021-.+")) || (FIRST_LAUNCH =~ "^2022-1.+") || (FIRST_LAUNCH =~ "^2022-0[4-9].+" || (FIRST_LAUNCH =~ "^2022-03-[1-3].+")))'
+        release['id'] = 'steam-overlay-compat-1'
+        release['notification'] = { 'base': 'compatNotice', 'id': 'steam-compat-1', 'minShown': 10 }
+        release['infoLink'] = 'https://wz2100.net/compat/steamoverlay/?platform={{PLATFORM}}'
+        channel['compatNotices'].append(release)
+    except KeyError as e:
+        print("Missing expected key in latestgithubrelease JSON: {0}".format(e.args[0]))
+        raise
     # # Example compat notices format - NOTE: propertyMatch *MUST* be enhanced to specify the exact situation in which the notice is displayed
     # try:
     #     release = dict()
