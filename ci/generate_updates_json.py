@@ -90,6 +90,8 @@ def convert_github_json_date_to_datetime(github_date_string: str):
 MS_STORE_RELEASE_GRACE_DAYS = 3
 
 def msstore_allowed_prior_stable_release(release: dict):
+    if release['tag_name'] == '4.2.7':
+        return True # temp - permit 4.2.7
     release_published_at = convert_github_json_date_to_datetime(release['published_at'])
     return ((datetime.now() - release_published_at).days <= MS_STORE_RELEASE_GRACE_DAYS)
 
