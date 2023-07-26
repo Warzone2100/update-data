@@ -88,7 +88,7 @@ jobs:
           echo "Signing wz2100_compat.json"
           "${GITHUB_WORKSPACE}/data/signjson/bin/signjson" -k "${{ secrets.SIGNJSON_B64_SECRETKEY }}" "wz2100_compat.json"
       - name: Checkout gh-pages branch
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           ref: gh-pages
           path: gh-pages
