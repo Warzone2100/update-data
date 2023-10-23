@@ -18,13 +18,13 @@ def gen_msstore_release_channel(latestgithubrelease: dict, releaselist: list) ->
 def gen_release_channel(latestgithubrelease: dict) -> dict:
     channel = dict()
     channel['channel'] = 'release'
-    channel['channelConditional'] = 'GIT_TAG =~ ".+"'
+    channel['channelConditional'] = 'GIT_TAG =~ "^{0}$"'.format(latestgithubrelease['tag_name'])
     channel['compatNotices'] = []
     try:
         release = dict()
-        release['propertyMatch'] = '(GIT_TAG =~ ".+") && (WZ_PACKAGE_DISTRIBUTOR =~ "^wz2100.net$") && (WIN_LOADEDMODULENAMES =~ "\\"gameoverlayrenderer64.dll\\"") && ((!(FIRST_LAUNCH =~ "^2022-.+") && !(FIRST_LAUNCH =~ "^2021-.+")) || (FIRST_LAUNCH =~ "^2022-1.+") || (FIRST_LAUNCH =~ "^2022-0[4-9].+" || (FIRST_LAUNCH =~ "^2022-03-[1-3].+")))'
+        release['propertyMatch'] = '(GIT_TAG =~ "^{0}$") && (WZ_PACKAGE_DISTRIBUTOR =~ "^wz2100.net$") && (WIN_LOADEDMODULENAMES =~ "\\"gameoverlayrenderer64.dll\\"") && ((!(FIRST_LAUNCH =~ "^2022-.+") && !(FIRST_LAUNCH =~ "^2021-.+")) || (FIRST_LAUNCH =~ "^2022-1.+") || (FIRST_LAUNCH =~ "^2022-0[4-9].+" || (FIRST_LAUNCH =~ "^2022-03-[1-3].+")))'.format(latestgithubrelease['tag_name'])
         release['id'] = 'compat-1'
-        release['notification'] = { 'base': 'compatNotice', 'id': 'steam-compat-1', 'minShown': 10 }
+        release['notification'] = { 'base': 'compatNotice', 'id': 'steam-compat-{0}'.format(latestgithubrelease['tag_name']), 'minShown': 10 }
         release['infoLink'] = 'https://wz2100.net/compat/steamoverlay/?platform={{PLATFORM}}'
         channel['compatNotices'].append(release)
     except KeyError as e:
@@ -43,6 +43,22 @@ def gen_release_channel(latestgithubrelease: dict) -> dict:
     #     raise
     return channel
 
+def gen_old_release_channel(latestgithubrelease: dict) -> dict:
+    channel = dict()
+    channel['channel'] = 'release'
+    channel['channelConditional'] = 'GIT_TAG =~ ".+"'
+    channel['compatNotices'] = []
+    try:
+        release = dict()
+        release['propertyMatch'] = '(GIT_TAG =~ ".+") && (WZ_PACKAGE_DISTRIBUTOR =~ "^wz2100.net$") && (WIN_LOADEDMODULENAMES =~ "\\"gameoverlayrenderer64.dll\\"") && ((!(FIRST_LAUNCH =~ "^2022-.+") && !(FIRST_LAUNCH =~ "^2021-.+")) || (FIRST_LAUNCH =~ "^2022-1.+") || (FIRST_LAUNCH =~ "^2022-0[4-9].+" || (FIRST_LAUNCH =~ "^2022-03-[1-3].+")))'
+        release['id'] = 'compat-1'
+        release['notification'] = { 'base': 'compatNotice', 'id': 'steam-compat-1-{0}'.format(datetime.utcnow().strftime('%Y-%m-%d')), 'minShown': 10 }
+        release['infoLink'] = 'https://wz2100.net/compat/steamoverlay/?platform={{PLATFORM}}'
+        channel['compatNotices'].append(release)
+    except KeyError as e:
+        print("Missing expected key in latestgithubrelease JSON: {0}".format(e.args[0]))
+        raise
+
 def gen_compat_file(latestgithubrelease: dict, releaselist: list, latestdevcommit: dict) -> dict:
     compat = dict()
     valid_thru = datetime.utcnow() + timedelta(hours=25)
@@ -50,6 +66,7 @@ def gen_compat_file(latestgithubrelease: dict, releaselist: list, latestdevcommi
     compat['channels'] = []
     compat['channels'].append(gen_msstore_release_channel(latestgithubrelease, releaselist))
     compat['channels'].append(gen_release_channel(latestgithubrelease))
+    compat['channels'].append(gen_old_release_channel(latestgithubrelease))
     return compat
 
 def main(argv):
