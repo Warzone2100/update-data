@@ -58,6 +58,7 @@ def gen_old_release_channel(latestgithubrelease: dict) -> dict:
     except KeyError as e:
         print("Missing expected key in latestgithubrelease JSON: {0}".format(e.args[0]))
         raise
+    return channel
 
 def gen_compat_file(latestgithubrelease: dict, releaselist: list, latestdevcommit: dict) -> dict:
     compat = dict()
