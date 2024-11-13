@@ -1,10 +1,10 @@
 {
-  "listMOTD_Default": "Welcome! The latest version of Warzone 2100 is 4.5.4\nDownload @ https://wz2100.net",
-  "listMOTD_LastHostedGame": "Welcome! The latest version of Warzone 2100 is 4.5.4\nDownload @ https://wz2100.net",
+  "listMOTD_Default": "Welcome! The latest version of Warzone 2100 is 4.5.5\nDownload @ https://wz2100.net",
+  "listMOTD_LastHostedGame": "Welcome! The latest version of Warzone 2100 is 4.5.5\nDownload @ https://wz2100.net",
   "unsupportedHostMessage": "Your version of the game is not supported any longer.\n Update your game version today @ https://wz2100.net !",
   "versionProperties": [
     {
-      "versionStringGlob": "4.5.4",
+      "versionStringGlob": "4.5.5",
       "motd": "Welcome to Warzone 2100!\nYour game is now hosted on the lobby server.",
       "supported": true
     },
@@ -15,7 +15,7 @@
     },
     {
       "versionStringGlob": "*",
-      "motd": "Please upgrade your Warzone to 4.5.4! Your version is NOT supported.\nSee: https://wz2100.net",
+      "motd": "Please upgrade your Warzone to 4.5.5! Your version is NOT supported.\nSee: https://wz2100.net",
       "supported": false
     }
   ],
@@ -54,7 +54,8 @@
       "20486"
     ],
     "0x4000": [
-      "92"
+      "92",
+      "93"
     ]
   }
 }
