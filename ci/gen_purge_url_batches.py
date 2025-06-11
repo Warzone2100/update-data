@@ -21,7 +21,8 @@ def generatePurgeURLsList(inputfile: str, domain: str, protocols = ['https', 'ht
             path = line.strip().lstrip("/")
             for protocol in protocols:
                 urllist.append("{0}://{1}/{2}".format(protocol, domain, path))
-                if path.lower().endswith("/index.html"):
+                path_lowered = path.lower()
+                if path_lowered.endswith("/index.html") or path_lowered == "index.html":
                     # Also append the path without the index.html suffix
                     urllist.append("{0}://{1}/{2}".format(protocol, domain, path[:-10]))
     return urllist
