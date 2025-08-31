@@ -4,7 +4,7 @@
   "unsupportedHostMessage": "Your version of the game is not supported any longer.\n Update your game version today @ https://wz2100.net !",
   "versionProperties": [
     {
-      "versionStringGlob": "4.6.0-beta3",
+      "versionStringGlob": "4.6.0-beta4",
       "motd": "Thank you for trying a preview release of Warzone 2100!\nYour game is now hosted on the lobby server.",
       "supported": true
     },
@@ -60,7 +60,7 @@
     ],
     "0x4000": [
       "93",
-      "96"
+      "97"
     ]
   }
 }
