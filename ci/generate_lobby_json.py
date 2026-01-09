@@ -291,7 +291,7 @@ def get_releases_netcodeVersions(latestgithubrelease: dict, releaselist: list) -
 def gen_lobby_file(latestgithubrelease: dict, releaselist: list, latestdevcommit: dict) -> dict:
     lobbyinfo = dict()
     lobbyinfo['listMOTD_Default'] = 'Welcome! The latest version of Warzone 2100 is {0}\nDownload @ https://wz2100.net'.format(latestgithubrelease['tag_name'])
-    lobbyinfo['listMOTD_LastHostedGame'] = 'Welcome! The latest version of Warzone 2100 is {0}\nDownload @ https://wz2100.net'.format(latestgithubrelease['tag_name'])
+    lobbyinfo['listMOTD_LastHostedGame'] = 'Welcome! The latest version of Warzone 2100 is {0} - Download @ https://wz2100.net\n**NEWS**: Join Autohost matches for ratings and leaderboards @ wz2100-autohost.net'.format(latestgithubrelease['tag_name'])
     lobbyinfo['unsupportedHostMessage'] = 'Your version of the game is not supported any longer.\n Update your game version today @ https://wz2100.net !'
     
     lobbyinfo['versionProperties'] = []
